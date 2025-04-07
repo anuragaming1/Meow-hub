@@ -1,0 +1,634 @@
+--// Anura Hub - Part1.lua
+local plr = game.Players.LocalPlayer
+repeat wait() until plr.Character
+
+-- UI
+local sg = Instance.new("ScreenGui", game.CoreGui)
+sg.Name = "AnuraHubUI"
+local main = Instance.new("Frame", sg)
+main.Size = UDim2.new(0, 300, 0, 200)
+main.Position = UDim2.new(0.5, -150, 0.5, -100)
+main.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+main.Visible = true
+main.Active = true
+main.Draggable = true
+
+-- Background Image
+local bg = Instance.new("ImageLabel", main)
+bg.Size = UDim2.new(1, 0, 1, 0)
+bg.Position = UDim2.new(0, 0, 0, 0)
+bg.Image = "rbxassetid://131151731604309"
+bg.BackgroundTransparency = 1
+
+-- Logo Toggle UI
+local logo = Instance.new("ImageButton", sg)
+logo.Size = UDim2.new(0, 50, 0, 50)
+logo.Position = UDim2.new(0, 10, 0, 10)
+logo.Image = "rbxassetid://95689726591891"
+logo.BackgroundTransparency = 1
+logo.MouseButton1Click:Connect(function()
+	main.Visible = not main.Visible
+end)
+
+-- Auto chọn team
+local function ChooseTeam(team)
+	local args = {
+		[1] = "SetTeam",
+		[2] = team
+	}
+	game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer(unpack(args))
+end
+
+spawn(function()
+	wait(1)
+	if plr.Team == nil or tostring(plr.Team) == "Pirates" then
+		ChooseTeam("Pirates")
+	else
+		ChooseTeam("Marines")
+	end
+end)
+
+-- Thêm tiêu đề
+local title = Instance.new("TextLabel", main)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.Text = "Anura Hub"
+title.TextColor3 = Color3.fromRGB(255, 80, 80)
+title.TextScaled = true
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+
+-- Hiển thị FPS và thời gian
+local fpsLabel = Instance.new("TextLabel", main)
+fpsLabel.Size = UDim2.new(1, 0, 0, 20)
+fpsLabel.Position = UDim2.new(0, 0, 0, 35)
+fpsLabel.BackgroundTransparency = 1
+fpsLabel.TextColor3 = Color3.new(1, 1, 1)
+fpsLabel.Font = Enum.Font.Code
+fpsLabel.TextScaled = true
+
+local startTime = tick()
+game:GetService("RunService").RenderStepped:Connect(function()
+	local fps = math.floor(1 / game:GetService("RunService").RenderStepped:Wait())
+	local uptime = math.floor(tick() - startTime)
+	fpsLabel.Text = "FPS: " .. fps .. " | Time: " .. uptime .. "s"
+end)
+--// Anura Hub - Part2.lua (HUD Thông Tin + Next Player)
+
+local plr = game.Players.LocalPlayer
+local sg = game.CoreGui:FindFirstChild("AnuraHubUI")
+if not sg then return end
+local main = sg:FindFirstChildOfClass("Frame")
+
+-- HUD Label
+local hud = Instance.new("TextLabel", main)
+hud.Size = UDim2.new(1, 0, 0, 80)
+hud.Position = UDim2.new(0, 0, 0, 60)
+hud.BackgroundTransparency = 1
+hud.TextColor3 = Color3.fromRGB(0, 255, 0)
+hud.Font = Enum.Font.Code
+hud.TextScaled = true
+hud.TextWrapped = true
+hud.Text = "Loading HUD..."
+
+local bounty = 0
+local totalKill = 0
+local currentTarget = "None"
+local players = game:GetService("Players")
+
+-- Nút "Next Player"
+local nextBtn = Instance.new("TextButton", main)
+nextBtn.Size = UDim2.new(1, 0, 0, 30)
+nextBtn.Position = UDim2.new(0, 0, 1, -30)
+nextBtn.Text = "Next Player"
+nextBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 255)
+nextBtn.TextColor3 = Color3.new(1, 1, 1)
+nextBtn.Font = Enum.Font.GothamBold
+nextBtn.TextScaled = true
+nextBtn.MouseButton1Click:Connect(function()
+	-- Placeholder xử lý đổi mục tiêu
+	currentTarget = "Tìm người chơi mới..."
+	wait(1)
+	for _, p in pairs(players:GetPlayers()) do
+		if p ~= plr and p.Team ~= plr.Team and not p.Neutral then
+			currentTarget = p.Name
+			break
+		end
+	end
+end)
+
+-- Cập nhật thông tin liên tục
+spawn(function()
+	while true do wait(1)
+		local stats = plr:FindFirstChild("leaderstats")
+		if stats and stats:FindFirstChild("Bounty") then
+			bounty = stats.Bounty.Value
+		end
+		hud.Text = string.format(
+			"Bounty: %s\nKill: %s\nTarget: %s\nPlayers: %d",
+			bounty,
+			totalKill,
+			currentTarget,
+			#players:GetPlayers()
+		)
+	end
+end)
+--// Anura Hub - Part3.lua (Tween TP đến player gần nhất)
+
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local plr = Players.LocalPlayer
+local char = plr.Character or plr.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+
+local function getClosestPlayer()
+	local closest, dist = nil, math.huge
+	for _, p in pairs(Players:GetPlayers()) do
+		if p ~= plr and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Team ~= plr.Team then
+			local targetPos = p.Character.HumanoidRootPart.Position
+			local mag = (hrp.Position - targetPos).Magnitude
+			if mag < dist and mag < 6000 then
+				closest = p
+				dist = mag
+			end
+		end
+	end
+	return closest
+end
+
+-- Tốc độ Tween
+local Speed = 300
+
+-- Offset mục tiêu
+local offset = Vector3.new(0, 3, 0)
+
+spawn(function()
+	while true do
+		local target = getClosestPlayer()
+		if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+			local goal = {Position = target.Character.HumanoidRootPart.Position + offset}
+			local distance = (hrp.Position - goal.Position).Magnitude
+			local time = distance / Speed
+			local tween = TweenService:Create(hrp, TweenInfo.new(time, Enum.EasingStyle.Linear), goal)
+			tween:Play()
+			tween.Completed:Wait()
+		end
+		wait(0.5)
+	end
+end)
+--// Anura Hub - Part4.lua (Auto bật kỹ năng hỗ trợ, fix target)
+
+local plr = game.Players.LocalPlayer
+local char = plr.Character or plr.CharacterAdded:Wait()
+local humanoid = char:WaitForChild("Humanoid")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local remotes = plr:WaitForChild("PlayerGui"):FindFirstChild("Main"):FindFirstChild("RemoteFunction")
+
+local function pressKey(key)
+	keypress(Enum.KeyCode[key])
+	wait(0.05)
+	keyrelease(Enum.KeyCode[key])
+end
+
+-- Auto bật Aura (J), Instinct (E), V3 (T), V4 (Y), PvP
+spawn(function()
+	while true do
+		pcall(function()
+			pressKey("J") -- Aura
+			wait(0.1)
+			pressKey("E") -- Instinct
+			wait(0.1)
+			pressKey("T") -- V3 (spam để chắc chắn)
+			wait(0.1)
+			pressKey("Y") -- V4
+		end)
+		wait(2)
+	end
+end)
+
+-- Auto bật PvP
+spawn(function()
+	while true do
+		local success, result = pcall(function()
+			local pvp = require(game.Players.LocalPlayer.PlayerScripts.CombatFramework.PvP)
+			if pvp and not pvp.active then
+				pvp:Toggle()
+			end
+		end)
+		wait(3)
+	end
+end)
+
+-- Auto Summon Sea Beast nếu đủ bounty
+spawn(function()
+	while true do
+		if plr.leaderstats and plr.leaderstats.Bounty.Value >= 10000000 then
+			local args = {[1] = "SeaBeast"}
+			game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer(unpack(args))
+		end
+		wait(30)
+	end
+end)
+
+-- Auto chọn mục tiêu mới khi target chết/safezone
+_G.CurrentTarget = nil
+local function isSafeZone(char)
+	return char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart:FindFirstChild("SafeZone")
+end
+
+spawn(function()
+	while true do
+		if _G.CurrentTarget and _G.CurrentTarget.Character then
+			local hum = _G.CurrentTarget.Character:FindFirstChildOfClass("Humanoid")
+			if not hum or hum.Health <= 0 or isSafeZone(_G.CurrentTarget.Character) then
+				_G.CurrentTarget = nil -- reset để Part3 tìm lại target mới
+			end
+		end
+		wait(1)
+	end
+end)
+
+-- Auto respawn nếu bị chết
+spawn(function()
+	while true do
+		if plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health <= 0 then
+			wait(5)
+			plr:LoadCharacter()
+		end
+		wait(1)
+	end
+end)
+--// Anura Hub - Part5.lua (Auto Combo Skill + Vũ khí)
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local function pressKey(key)
+	keypress(Enum.KeyCode[key])
+	wait(0.2)
+	keyrelease(Enum.KeyCode[key])
+end
+
+-- Danh sách thứ tự kỹ năng
+local comboList = {
+	{Key = "C", Weapon = "Melee"},
+	{Key = "X", Weapon = "Melee"},
+	{Key = "Z", Weapon = "Fruit"},
+	{Key = "X", Weapon = "Fruit"},
+	{Key = "Z", Weapon = "Melee"},
+	{Key = "Z", Weapon = "Sword"},
+	{Key = "X", Weapon = "Gun"},
+	{Key = "C", Weapon = "Fruit"},
+	{Key = "X", Weapon = "Sword"},
+	{Key = "Z", Weapon = "Gun"},
+	{Key = "V", Weapon = "Fruit"},
+	{Key = "F", Weapon = "Fruit"},
+}
+
+-- Map tên vũ khí với nút bấm
+local weaponKey = {
+	Melee = "One",
+	Sword = "Two",
+	Gun   = "Three",
+	Fruit = "Four"
+}
+
+-- Tự động combo skill + đổi vũ khí
+spawn(function()
+	while true do
+		if _G.CurrentTarget and _G.CurrentTarget.Character and _G.CurrentTarget.Character:FindFirstChild("HumanoidRootPart") then
+			for _, combo in ipairs(comboList) do
+				local key = weaponKey[combo.Weapon]
+				if key then
+					pressKey(key)
+					wait(0.05)
+					pressKey(combo.Key)
+				end
+				wait(0.2)
+			end
+			-- Sau combo chuyển về Melee để đánh thường
+			pressKey("One")
+		end
+		wait(0.5)
+	end
+end)
+--// Anura Hub - Part6.lua (Auto Combo Skill + Vũ khí)
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local function pressKey(key)
+	keypress(Enum.KeyCode[key])
+	wait(0.2)
+	keyrelease(Enum.KeyCode[key])
+end
+
+-- Danh sách thứ tự kỹ năng
+local comboList = {
+	{Key = "C", Weapon = "Melee"},
+	{Key = "X", Weapon = "Melee"},
+	{Key = "Z", Weapon = "Fruit"},
+	{Key = "X", Weapon = "Fruit"},
+	{Key = "Z", Weapon = "Melee"},
+	{Key = "Z", Weapon = "Sword"},
+	{Key = "X", Weapon = "Gun"},
+	{Key = "C", Weapon = "Fruit"},
+	{Key = "X", Weapon = "Sword"},
+	{Key = "Z", Weapon = "Gun"},
+	{Key = "V", Weapon = "Fruit"},
+	{Key = "F", Weapon = "Fruit"},
+}
+
+-- Map tên vũ khí với nút bấm
+local weaponKey = {
+	Melee = "One",
+	Sword = "Two",
+	Gun   = "Three",
+	Fruit = "Four"
+}
+
+-- Tự động combo skill + đổi vũ khí
+spawn(function()
+	while true do
+		if _G.CurrentTarget and _G.CurrentTarget.Character and _G.CurrentTarget.Character:FindFirstChild("HumanoidRootPart") then
+			for _, combo in ipairs(comboList) do
+				local key = weaponKey[combo.Weapon]
+				if key then
+					pressKey(key)
+					wait(0.05)
+					pressKey(combo.Key)
+				end
+				wait(0.2)
+			end
+			-- Sau combo chuyển về Melee để đánh thường
+			pressKey("One")
+		end
+		wait(0.5)
+	end
+end)
+--// Anura Hub - Part7.lua (Auto Combo Skill + Vũ khí)
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local function pressKey(key)
+	keypress(Enum.KeyCode[key])
+	wait(0.2)
+	keyrelease(Enum.KeyCode[key])
+end
+
+-- Danh sách thứ tự kỹ năng
+local comboList = {
+	{Key = "C", Weapon = "Melee"},
+	{Key = "X", Weapon = "Melee"},
+	{Key = "Z", Weapon = "Fruit"},
+	{Key = "X", Weapon = "Fruit"},
+	{Key = "Z", Weapon = "Melee"},
+	{Key = "Z", Weapon = "Sword"},
+	{Key = "X", Weapon = "Gun"},
+	{Key = "C", Weapon = "Fruit"},
+	{Key = "X", Weapon = "Sword"},
+	{Key = "Z", Weapon = "Gun"},
+	{Key = "V", Weapon = "Fruit"},
+	{Key = "F", Weapon = "Fruit"},
+}
+
+-- Map tên vũ khí với nút bấm
+local weaponKey = {
+	Melee = "One",
+	Sword = "Two",
+	Gun   = "Three",
+	Fruit = "Four"
+}
+
+-- Tự động combo skill + đổi vũ khí
+spawn(function()
+	while true do
+		if _G.CurrentTarget and _G.CurrentTarget.Character and _G.CurrentTarget.Character:FindFirstChild("HumanoidRootPart") then
+			for _, combo in ipairs(comboList) do
+				local key = weaponKey[combo.Weapon]
+				if key then
+					pressKey(key)
+					wait(0.05)
+					pressKey(combo.Key)
+				end
+				wait(0.2)
+			end
+			-- Sau combo chuyển về Melee để đánh thường
+			pressKey("One")
+		end
+		wait(0.5)
+	end
+end)
+--// Anura Hub - Part8.lua (AFK Mode + Đi Trên Nước + Bật Melee Gần Player)
+
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- AFK MODE: đổi vũ khí liên tục để không bị văng game
+spawn(function()
+	while true do
+		keypress(Enum.KeyCode.One) wait(0.1) keyrelease(Enum.KeyCode.One)
+		keypress(Enum.KeyCode.Two) wait(0.1) keyrelease(Enum.KeyCode.Two)
+		keypress(Enum.KeyCode.Three) wait(0.1) keyrelease(Enum.KeyCode.Three)
+		keypress(Enum.KeyCode.Four) wait(0.1) keyrelease(Enum.KeyCode.Four)
+		wait(3) -- mỗi 3s đổi vũ khí 1 lần
+	end
+end)
+
+-- Tính năng đi trên mặt nước + lava (tạo nền ảo dưới chân)
+spawn(function()
+	while true do
+		if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+			local hrp = LocalPlayer.Character.HumanoidRootPart
+			local part = Instance.new("Part", workspace)
+			part.Size = Vector3.new(10, 1, 10)
+			part.Anchored = true
+			part.CanCollide = true
+			part.Transparency = 1
+			part.Position = hrp.Position - Vector3.new(0, 3.5, 0)
+			game.Debris:AddItem(part, 0.1)
+		end
+		wait(0.05)
+	end
+end)
+
+-- Tự bật Melee khi gần player
+spawn(function()
+	while true do
+		for _, player in pairs(Players:GetPlayers()) do
+			if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+				local dist = (LocalPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).magnitude
+				if dist < 25 and not player.Character:FindFirstChild("ForceField") then
+					keypress(Enum.KeyCode.One) wait(0.1) keyrelease(Enum.KeyCode.One)
+				end
+			end
+		end
+		wait(0.5)
+	end
+end)
+--// Anura Hub - Part9.lua (Auto Skill Mode: Haki, Aura, V3, V4, PvP)
+
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Tự bật PvP
+spawn(function()
+    while true do
+        if game:GetService("ReplicatedStorage"):FindFirstChild("Remotes"):FindFirstChild("CommF_") then
+            game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("EnablePvp")
+        end
+        wait(10) -- bật lại mỗi 10s đề phòng bị tắt
+    end
+end)
+
+-- Tự bật Observation Haki (E), Aura (J), Tộc V3 (T), Tộc V4 (Y)
+spawn(function()
+    while true do
+        -- Observation Haki
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+        wait(0.1)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+        wait(0.2)
+
+        -- Aura
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.J, false, game)
+        wait(0.1)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.J, false, game)
+        wait(0.2)
+
+        -- Tộc V3
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.T, false, game)
+        wait(0.05)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.T, false, game)
+        wait(0.05)
+
+        -- Tộc V4
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Y, false, game)
+        wait(0.05)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Y, false, game)
+        wait(3)
+    end
+end)
+--// Anura Hub - Part10.lua (Auto Combo Skill + Auto Weapon Switch)
+
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local delaySkill = 0.01
+
+-- Các phím kỹ năng: Z, X, C, V, F
+local skillKeys = {
+    Enum.KeyCode.C,
+    Enum.KeyCode.X,
+    Enum.KeyCode.Z,
+    Enum.KeyCode.X,
+    Enum.KeyCode.Z,
+    Enum.KeyCode.Z, -- Sword Z
+    Enum.KeyCode.X, -- Gun X
+    Enum.KeyCode.C, -- Fruit C
+    Enum.KeyCode.X, -- Sword X
+    Enum.KeyCode.Z, -- Gun Z
+    Enum.KeyCode.V,
+    Enum.KeyCode.F
+}
+
+-- Phím chuyển vũ khí: 1 = Melee, 2 = Sword, 3 = Gun, 4 = Fruit
+local weaponKeys = {
+    Enum.KeyCode.One,
+    Enum.KeyCode.Two,
+    Enum.KeyCode.Three,
+    Enum.KeyCode.Four
+}
+
+-- Combo skill liên tục
+spawn(function()
+    while true do
+        for _, key in ipairs(skillKeys) do
+            VirtualInputManager:SendKeyEvent(true, key, false, game)
+            wait(delaySkill)
+            VirtualInputManager:SendKeyEvent(false, key, false, game)
+            wait(delaySkill)
+        end
+    end
+end)
+
+-- Tự động chuyển vũ khí liên tục (vòng lặp)
+spawn(function()
+    while true do
+        for _, key in ipairs(weaponKeys) do
+            VirtualInputManager:SendKeyEvent(true, key, false, game)
+            wait(delaySkill)
+            VirtualInputManager:SendKeyEvent(false, key, false, game)
+            wait(delaySkill)
+        end
+    end
+end)
+--// Anura Hub - Part11.lua (Auto Combo Skill + Auto Weapon Switch)
+
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local delaySkill = 0.01
+
+-- Các phím kỹ năng: Z, X, C, V, F
+local skillKeys = {
+    Enum.KeyCode.C,
+    Enum.KeyCode.X,
+    Enum.KeyCode.Z,
+    Enum.KeyCode.X,
+    Enum.KeyCode.Z,
+    Enum.KeyCode.Z, -- Sword Z
+    Enum.KeyCode.X, -- Gun X
+    Enum.KeyCode.C, -- Fruit C
+    Enum.KeyCode.X, -- Sword X
+    Enum.KeyCode.Z, -- Gun Z
+    Enum.KeyCode.V,
+    Enum.KeyCode.F
+}
+
+-- Phím chuyển vũ khí: 1 = Melee, 2 = Sword, 3 = Gun, 4 = Fruit
+local weaponKeys = {
+    Enum.KeyCode.One,
+    Enum.KeyCode.Two,
+    Enum.KeyCode.Three,
+    Enum.KeyCode.Four
+}
+
+-- Combo skill liên tục
+spawn(function()
+    while true do
+        for _, key in ipairs(skillKeys) do
+            VirtualInputManager:SendKeyEvent(true, key, false, game)
+            wait(delaySkill)
+            VirtualInputManager:SendKeyEvent(false, key, false, game)
+            wait(delaySkill)
+        end
+    end
+end)
+
+-- Tự động chuyển vũ khí liên tục (vòng lặp)
+spawn(function()
+    while true do
+        for _, key in ipairs(weaponKeys) do
+            VirtualInputManager:SendKeyEvent(true, key, false, game)
+            wait(delaySkill)
+            VirtualInputManager:SendKeyEvent(false, key, false, game)
+            wait(delaySkill)
+        end
+    end
+end)
+--// Anura Hub - Part 27: Rainbow ESP + 100% Aimbot //
+
+local Players = game:GetService("Players") local RunService = game:GetService("RunService") local Camera = workspace.CurrentCamera local LocalPlayer = Players.LocalPlayer
+
+-- Rainbow Color Generator local function getRainbowColor(speed) local t = tick() * speed local r = math.sin(t) * 0.5 + 0.5 local g = math.sin(t + 2) * 0.5 + 0.5 local b = math.sin(t + 4) * 0.5 + 0.5 return Color3.new(r, g, b) end
+
+-- ESP Table local ESPTable = {}
+
+-- Function to create ESP for a player local function createESP(targetPlayer) if targetPlayer == LocalPlayer or ESPTable[targetPlayer] then return end local espBox = Drawing.new("Square") espBox.Thickness = 1 espBox.Filled = false espBox.Visible = false ESPTable[targetPlayer] = espBox end
+
+-- Update ESP RunService.RenderStepped:Connect(function() for _, player in ipairs(Players:GetPlayers()) do if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then createESP(player) local esp = ESPTable[player] local rootPart = player.Character.HumanoidRootPart local screenPos, onScreen = Camera:WorldToViewportPoint(rootPart.Position) if onScreen then local size = Vector2.new(60, 100) esp.Size = size esp.Position = Vector2.new(screenPos.X - size.X / 2, screenPos.Y - size.Y / 2) esp.Color = getRainbowColor(2) esp.Visible = true else esp.Visible = false end elseif ESPTable[player] then ESPTable[player].Visible = false end end end)
+
+-- Aimbot 100% Hit (Very Basic Targeting for Demonstration) local aimEnabled = true local function getClosestPlayer() local closestPlayer = nil local shortestDistance = math.huge for _, player in pairs(Players:GetPlayers()) do if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then local rootPart = player.Character.HumanoidRootPart local screenPos, onScreen = Camera:WorldToViewportPoint(rootPart.Position) if onScreen then local distance = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude if distance < shortestDistance then shortestDistance = distance closestPlayer = player end end end end return closestPlayer end
+
+-- Lock camera to closest target RunService.RenderStepped:Connect(function() if aimEnabled then local target = getClosestPlayer() if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.HumanoidRootPart.Position) end end end)
+
+print("[Anura Hub] Rainbow ESP + Aimbot 100% Loaded")
+
