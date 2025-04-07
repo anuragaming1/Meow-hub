@@ -632,3 +632,98 @@ local Players = game:GetService("Players") local RunService = game:GetService("R
 
 print("[Anura Hub] Rainbow ESP + Aimbot 100% Loaded")
 
+--// Anura Hub - Part 28:
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+
+getgenv().Target = nil
+
+function IsSafeZone(player)
+    local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return true end
+    -- Safe Zone thường có vị trí nhất định, ví dụ quanh nhà spawn
+    return (hrp.Position - Vector3.new(0, hrp.Position.Y, 0)).Magnitude < 500
+end
+
+function IsPvPEnabled(player)
+    local tag = player:FindFirstChild("DataFolder") or player:FindFirstChild("leaderstats")
+    return tag and (tag:FindFirstChild("PvP") or tag:FindFirstChild("isPvpEnabled")) and (tag.PvP.Value == true or tag.isPvpEnabled.Value == true)
+end
+
+function GetNearestTarget()
+    local shortestDistance = math.huge
+    local closestPlayer = nil
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            if IsPvPEnabled(player) and not IsSafeZone(player) then
+                local distance = (LocalPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    closestPlayer = player
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+-- Cập nhật target liên tục
+spawn(function()
+    while task.wait(1) do
+        local found = GetNearestTarget()
+        if found then
+            getgenv().Target = found
+            print("[Anura Hub] Locked target: " .. found.Name)
+        else
+            getgenv().Target = nil
+        end
+    end
+end)
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+
+getgenv().Target = nil
+
+function IsSafeZone(player)
+    local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return true end
+    -- Safe Zone thường có vị trí nhất định, ví dụ quanh nhà spawn
+    return (hrp.Position - Vector3.new(0, hrp.Position.Y, 0)).Magnitude < 500
+end
+
+function IsPvPEnabled(player)
+    local tag = player:FindFirstChild("DataFolder") or player:FindFirstChild("leaderstats")
+    return tag and (tag:FindFirstChild("PvP") or tag:FindFirstChild("isPvpEnabled")) and (tag.PvP.Value == true or tag.isPvpEnabled.Value == true)
+end
+
+function GetNearestTarget()
+    local shortestDistance = math.huge
+    local closestPlayer = nil
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            if IsPvPEnabled(player) and not IsSafeZone(player) then
+                local distance = (LocalPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    closestPlayer = player
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+-- Cập nhật target liên tục
+spawn(function()
+    while task.wait(1) do
+        local found = GetNearestTarget()
+        if found then
+            getgenv().Target = found
+            print("[Anura Hub] Locked target: " .. found.Name)
+        else
+            getgenv().Target = nil
+        end
+    end
+end)
