@@ -203,7 +203,7 @@ spawn(function()
 			wait(0.1)
 			pressKey("Y") -- V4
 		end)
-		wait(2)
+		wait(8)
 	end
 end)
 
@@ -301,15 +301,15 @@ spawn(function()
 				local key = weaponKey[combo.Weapon]
 				if key then
 					pressKey(key)
-					wait(0.5)
+					wait(1.5)
 					pressKey(combo.Key)
 				end
-				wait(1.2)
+				wait(3)
 			end
 			-- Sau combo chuyển về Melee để đánh thường
 			pressKey("One")
 		end
-		wait(0.5)
+		wait(2)
 	end
 end)
 --// Anura Hub - Part6.lua (Auto Combo Skill + Vũ khí)
@@ -318,7 +318,7 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local function pressKey(key)
 	keypress(Enum.KeyCode[key])
-	wait(0.2)
+	wait(0.92)
 	keyrelease(Enum.KeyCode[key])
 end
 
@@ -354,15 +354,15 @@ spawn(function()
 				local key = weaponKey[combo.Weapon]
 				if key then
 					pressKey(key)
-					wait(0.05)
+					wait(3)
 					pressKey(combo.Key)
 				end
-				wait(0.2)
+				wait(3)
 			end
 			-- Sau combo chuyển về Melee để đánh thường
 			pressKey("One")
 		end
-		wait(0.5)
+		wait(2)
 	end
 end)
 --// Anura Hub - Part7.lua (Auto Combo Skill + Vũ khí)
