@@ -513,7 +513,7 @@ end)
 --// Anura Hub - Part10.lua (Auto Combo Skill + Auto Weapon Switch)
 
 local VirtualInputManager = game:GetService("VirtualInputManager")
-local delaySkill = 0.01
+local delaySkill = 0.1
 
 -- Các phím kỹ năng: Z, X, C, V, F
 local skillKeys = {
