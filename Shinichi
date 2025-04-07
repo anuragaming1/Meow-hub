@@ -301,10 +301,10 @@ spawn(function()
 				local key = weaponKey[combo.Weapon]
 				if key then
 					pressKey(key)
-					wait(0.05)
+					wait(0.5)
 					pressKey(combo.Key)
 				end
-				wait(0.2)
+				wait(1.2)
 			end
 			-- Sau combo chuyển về Melee để đánh thường
 			pressKey("One")
