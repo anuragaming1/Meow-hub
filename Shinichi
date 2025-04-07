@@ -727,3 +727,39 @@ spawn(function()
         end
     end
 end)
+--// Anura Hub - Part 28: bay tới người chơi chỉ định:
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+getgenv().TargetName = "TênNgườiChơi" -- <== Đổi tên người chơi cần bay tới tại đây
+
+function TweenToPlayer(targetName)
+    local targetPlayer = Players:FindFirstChild(targetName)
+    if not targetPlayer or not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        warn("Không tìm thấy player hoặc HumanoidRootPart!")
+        return
+    end
+
+    local targetHRP = targetPlayer.Character.HumanoidRootPart
+    local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not myHRP then
+        warn("Bạn không có HumanoidRootPart!")
+        return
+    end
+
+    -- Tính thời gian di chuyển theo khoảng cách và tốc độ
+    local distance = (myHRP.Position - targetHRP.Position).Magnitude
+    local time = distance / 280 -- tốc độ = 280
+
+    -- Cấu hình Tween
+    local tweenInfo = TweenInfo.new(time, Enum.EasingStyle.Linear)
+    local goal = {CFrame = targetHRP.CFrame * CFrame.new(2, 0, 2)} -- Bay tới điểm offset gần mục tiêu
+
+    -- Bắt đầu Tween
+    local tween = TweenService:Create(myHRP, tweenInfo, goal)
+    tween:Play()
+end
+
+-- Gọi hàm:
+TweenToPlayer(getgenv().TargetName)
