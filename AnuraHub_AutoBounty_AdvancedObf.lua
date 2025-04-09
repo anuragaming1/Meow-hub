@@ -715,64 +715,51 @@ UIS.InputBegan:Connect(function(input)
 end)
 
 print("[Anura Hub] No Clip đã bật! Nhấn B để bật/tắt (nếu dùng được)")           
---===[ Anura Hub - Silent Aimbot (No Screen Impact) ]===--
+--===[ Anura Hub - Auto Aimbot ]===--
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+local AimbotEnabled = true -- Bật Aimbot
 
-local AimbotEnabled = true
-local AimbotRange = 6000 -- Tầm aimbot
-local AimbotTargetPart = "Head" -- Có thể đổi thành "HumanoidRootPart" nếu muốn
+-- Cấu hình
+local AimbotRange = 6000 -- Tầm xa aimbot
+local TargetPart = "Head" -- Bộ phận ngắm tới (Head, HumanoidRootPart,...)
 
--- Hàm lấy player gần nhất trong tầm
-local function GetClosestPlayer()
-    local closestPlayer = nil
+-- Hàm tính khoảng cách 2 Vector3
+local function GetDistance(pos1, pos2)
+    return (pos1 - pos2).Magnitude
+end
+
+-- Tìm player gần nhất trong phạm vi
+local function GetNearestTarget()
+    local closest = nil
     local shortestDistance = AimbotRange
-
     for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild(AimbotTargetPart) then
-            local targetPart = player.Character[AimbotTargetPart]
-            local distance = (targetPart.Position - Camera.CFrame.Position).Magnitude
-            if distance < shortestDistance and player.Team ~= LocalPlayer.Team then
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild(TargetPart) then
+            local part = player.Character[TargetPart]
+            local distance = GetDistance(Camera.CFrame.Position, part.Position)
+            if distance < shortestDistance then
                 shortestDistance = distance
-                closestPlayer = player
+                closest = part
             end
         end
     end
-    return closestPlayer
+    return closest
 end
 
--- Silent Aim Function (không xoay màn hình)
-local function ModifyMousePosition()
-    local target = GetClosestPlayer()
-    if target and target.Character and target.Character:FindFirstChild(AimbotTargetPart) then
-        local pos = target.Character[AimbotTargetPart].Position
-        return pos
-    end
-    return nil
-end
-
--- Gắn vào raycast của vũ khí
-local mt = getrawmetatable(game)
-setreadonly(mt, false)
-local oldNamecall = mt.__namecall
-
-mt.__namecall = newcclosure(function(self, ...)
-    local args = {...}
-    local method = getnamecallmethod()
-    
-    if AimbotEnabled and method == "FindPartOnRayWithIgnoreList" then
-        local pos = ModifyMousePosition()
-        if pos then
-            args[1] = Ray.new(Camera.CFrame.Position, (pos - Camera.CFrame.Position).Unit * 1000)
-            return oldNamecall(self, unpack(args))
+-- Aimbot chạy mỗi frame
+RunService.RenderStepped:Connect(function()
+    if AimbotEnabled then
+        local target = GetNearestTarget()
+        if target then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
         end
     end
-    return oldNamecall(self, ...)
 end)
 
-print("[Anura Hub] Silent Aimbot đã bật! Không xoay màn hình.")  
+print("[Anura Hub] Auto Aimbot đã bật! Đang ngắm tự động vào", TargetPart)
 print("Auto Bounty Combat System loaded!")
 
 --[[
