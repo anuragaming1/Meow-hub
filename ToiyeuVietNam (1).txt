@@ -1,0 +1,904 @@
+-- Part1: Auto Bounty - Core Config & Setup by Anura Hub
+
+-- Cấu hình chính
+getgenv().Config = {
+    Team = "Pirates", -- Hoặc "Marines"
+    AutoTeam = true,
+    AutoSummonSeaBeast = true,
+    ComboDelay = 0.2,
+    LowHealthFlyUp = 10, -- %
+    ComebackHealth = 30, -- %
+    TweenSpeed = 300,
+    UseAura = true,
+    UseInstinct = true,
+    UsePVP = true,
+    AutoV4 = true,
+    SkipRaceV4 = true,
+    AFKMode = true,
+}
+
+-- Thứ tự combo chuẩn
+getgenv().ComboOrder = {
+    {Type = "Melee", Skill = "C"},
+    {Type = "Melee", Skill = "X"},
+    {Type = "Fruit", Skill = "Z"},
+    {Type = "Fruit", Skill = "X"},
+    {Type = "Melee", Skill = "Z"},
+    {Type = "Sword", Skill = "Z"},
+    {Type = "Gun", Skill = "X"},
+    {Type = "Fruit", Skill = "C"},
+    {Type = "Sword", Skill = "X"},
+    {Type = "Gun", Skill = "Z"},
+    {Type = "Fruit", Skill = "V"},
+    {Type = "Fruit", Skill = "F"},
+}
+
+-- Khởi động hệ thống
+repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
+local plr = game.Players.LocalPlayer
+local RunService = game:GetService("RunService")
+
+-- Anti script cũ
+for _,v in pairs(game.Workspace:GetChildren()) do
+    if v.Name == "Script" then v:Destroy() end
+end
+game.Workspace.ChildAdded:Connect(function(c)
+    if c.Name == "Script" then c:Destroy() end
+end)
+
+-- Auto chọn Team nếu cần
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local preferredTeam = getgenv().Config and getgenv().Config.Team or "Pirates" -- Hoặc "Marines"
+
+-- Auto chọn team bằng SetTeam chính xác
+task.spawn(function()
+    repeat wait(1)
+        pcall(function()
+            if not LocalPlayer.Team or tostring(LocalPlayer.Team) ~= preferredTeam then
+                ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", preferredTeam)
+            end
+        end)
+    until LocalPlayer.Team and tostring(LocalPlayer.Team) == preferredTeam
+end)
+
+-- Tự bật Aura, Instinct, PVP
+task.spawn(function()
+    while true do
+        pcall(function()
+            if getgenv().Config.UsePVP and plr.PlayerGui.Main.PvpDisabled.Visible == true then
+                game.ReplicatedStorage.Remotes.CommF_:InvokeServer("EnablePvp")
+            end
+            if getgenv().Config.UseAura and not plr.Character:FindFirstChild("HasBuso") then
+                game.ReplicatedStorage.Remotes.CommF_:InvokeServer("Buso")
+            end
+            if getgenv().Config.UseInstinct and not plr.Character:FindFirstChild("Instinct") then
+                keypress(0x65) wait(0.1) keyrelease(0x65)
+            end
+        end)
+        task.wait(1)
+    end
+end)
+
+-- AFK mode (đổi vũ khí liên tục)
+if getgenv().Config.AFKMode then
+    task.spawn(function()
+        while task.wait(15) do
+            local backpack = plr:FindFirstChild("Backpack")
+            if backpack then
+                for _, tool in pairs(backpack:GetChildren()) do
+                    if tool:IsA("Tool") then
+                        plr.Character.Humanoid:EquipTool(tool)
+                        task.wait(0.5)
+                    end
+                end
+            end
+        end
+    end)
+end
+
+print("[Anura Hub] Auto Bounty Part1 loaded.")
+
+-- Part2: Auto Combat Full (Fix TP & Target)
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local plr = Players.LocalPlayer
+
+-- Cấu hình mặc định nếu chưa có
+getgenv().Config = getgenv().Config or {
+    TweenSpeed = 300,
+    ComboDelay = 0.2,
+}
+getgenv().ComboOrder = getgenv().ComboOrder or {
+    {Type = "Melee", Skill = "C"},
+    {Type = "Melee", Skill = "X"},
+    {Type = "Fruit", Skill = "Z"},
+    {Type = "Fruit", Skill = "X"},
+    {Type = "Melee", Skill = "Z"},
+    {Type = "Sword", Skill = "Z"},
+    {Type = "Gun", Skill = "X"},
+    {Type = "Fruit", Skill = "C"},
+    {Type = "Sword", Skill = "X"},
+    {Type = "Gun", Skill = "Z"},
+    {Type = "Fruit", Skill = "V"},
+    {Type = "Fruit", Skill = "F"},
+}
+
+-- Tìm tool
+function EquipTool(toolType)
+    for _, v in pairs(plr.Backpack:GetChildren()) do
+        if v:IsA("Tool") and v.ToolTip == toolType then
+            plr.Character.Humanoid:EquipTool(v)
+            return true
+        end
+    end
+    for _, v in pairs(plr.Character:GetChildren()) do
+        if v:IsA("Tool") and v.ToolTip == toolType then
+            return true
+        end
+    end
+end
+
+-- Dùng skill
+function UseSkill(key, delay)
+    pcall(function()
+        game:GetService("VirtualInputManager"):SendKeyEvent(true, key, false, game)
+        task.wait(delay)
+        game:GetService("VirtualInputManager"):SendKeyEvent(false, key, false, game)
+    end)
+end
+
+-- Auto đánh thường
+function Click()
+    game:GetService("VirtualUser"):CaptureController()
+    game:GetService("VirtualUser"):Button1Down(Vector2.new(0, 1))
+end
+
+-- Tween đến mục tiêu
+function TweenTo(cf)
+    local offset = CFrame.new(0, 6, -3)
+    local dist = (plr.Character.HumanoidRootPart.Position - cf.Position).Magnitude
+    local tweenInfo = TweenInfo.new(dist / getgenv().Config.TweenSpeed, Enum.EasingStyle.Linear)
+    local goal = {CFrame = cf * offset}
+    local tween = TweenService:Create(plr.Character.HumanoidRootPart, tweenInfo, goal)
+    tween:Play()
+    tween.Completed:Wait()
+end
+
+-- Tìm player gần nhất bật PvP
+function FindTarget()
+    local closest = nil
+    local shortest = math.huge
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= plr and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = player.Character.HumanoidRootPart
+            local hp = player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health or 0
+            local dist = (plr.Character.HumanoidRootPart.Position - hrp.Position).Magnitude
+            if hp > 0 and dist < shortest then
+                closest = player
+                shortest = dist
+            end
+        end
+    end
+
+    return closest
+end
+
+-- Combo
+function ComboOn(target)
+    for _, s in ipairs(getgenv().ComboOrder) do
+        EquipTool(s.Type)
+        UseSkill(s.Skill, getgenv().Config.ComboDelay)
+    end
+    Click()
+end
+
+-- Auto chiến
+task.spawn(function()
+    while task.wait(0.5) do
+        local enemy = FindTarget()
+        if enemy and enemy.Character and enemy.Character:FindFirstChild("HumanoidRootPart") then
+            TweenTo(enemy.Character.HumanoidRootPart.CFrame)
+            ComboOn(enemy)
+        end
+    end
+end)
+
+print("[Anura Hub] Part2 - TP & Combo hoạt động.")
+
+-- Part3: Target Tracking & Control by Anura Hub
+
+local plr = game.Players.LocalPlayer
+local lastHitTime = os.clock()
+local targetStartTime = os.clock()
+local currentTarget = nil
+
+-- Kiểm tra PvP
+function IsPVPEnabled(player)
+    local gui = player:FindFirstChild("PlayerGui")
+    if gui and gui:FindFirstChild("Main") then
+        return gui.Main:FindFirstChild("PvpDisabled") and not gui.Main.PvpDisabled.Visible
+    end
+    return false
+end
+
+-- Kiểm tra Safe Zone
+function InSafeZone(player)
+    local gui = player:FindFirstChild("PlayerGui")
+    if gui and gui:FindFirstChild("Main") and gui.Main:FindFirstChild("BottomHUDList") then
+        return gui.Main.BottomHUDList.SafeZone.Visible
+    end
+    return false
+end
+
+-- Tìm target mới hợp lệ
+function FindSmartTarget()
+    local closest = nil
+    local shortest = math.huge
+
+    for _, p in pairs(game.Players:GetPlayers()) do
+        if p ~= plr and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local hp = p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health or 0
+            local dist = (plr.Character.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
+            if hp > 0 and dist < shortest and IsPVPEnabled(p) and not InSafeZone(p) then
+                shortest = dist
+                closest = p
+            end
+        end
+    end
+
+    return closest
+end
+
+-- Theo dõi trạng thái đánh
+function UpdateTargetState()
+    if currentTarget == nil or not currentTarget.Character or not currentTarget.Character:FindFirstChild("HumanoidRootPart") then
+        return false
+    end
+    local dist = (plr.Character.HumanoidRootPart.Position - currentTarget.Character.HumanoidRootPart.Position).Magnitude
+    if dist > 2500 or currentTarget.Character.Humanoid.Health <= 0 then
+        return false
+    end
+    if not IsPVPEnabled(currentTarget) or InSafeZone(currentTarget) then
+        return false
+    end
+    return true
+end
+
+-- Theo dõi thời gian tấn công
+function TickDamage()
+    lastHitTime = os.clock()
+end
+
+-- Vòng lặp xử lý target
+task.spawn(function()
+    while task.wait(1) do
+        if currentTarget == nil or not UpdateTargetState() then
+            currentTarget = FindSmartTarget()
+            targetStartTime = os.clock()
+            lastHitTime = os.clock()
+        else
+            -- Nếu không gây damage sau 30s => đổi người
+            if os.clock() - lastHitTime >= 30 then
+                print("[Anura Hub] Không gây damage sau 30s => Đổi target")
+                currentTarget = FindSmartTarget()
+                targetStartTime = os.clock()
+                lastHitTime = os.clock()
+            end
+            -- Nếu chưa kill sau 45s => đổi
+            if os.clock() - targetStartTime >= 45 then
+                print("[Anura Hub] Chưa kill sau 45s => Đổi target")
+                currentTarget = FindSmartTarget()
+                targetStartTime = os.clock()
+                lastHitTime = os.clock()
+            end
+        end
+    end
+end)
+
+-- Auto bật lại PVP nếu bị chết
+plr.CharacterAdded:Connect(function()
+    task.wait(3)
+    game.ReplicatedStorage.Remotes.CommF_:InvokeServer("EnablePvp")
+end)
+
+-- AFK Mode
+if getgenv().Config.AFKMode then
+    task.spawn(function()
+        while task.wait(10) do
+            for _, tool in pairs(plr.Backpack:GetChildren()) do
+                if tool:IsA("Tool") then
+                    plr.Character.Humanoid:EquipTool(tool)
+                    task.wait(0.3)
+                end
+            end
+        end
+    end)
+end
+
+-- Export target cho Part2
+_G.AutoBountyTarget = setmetatable({}, {
+    __index = function()
+        return currentTarget and currentTarget.Character
+    end
+})
+
+print("[Anura Hub] Part3 loaded: Smart Target Tracker active.")
+-- Part4: Fly, Support, Health Reaction by Anura Hub
+
+local plr = game.Players.LocalPlayer
+local hrp = nil
+
+-- Auto chọn lại team nếu chưa có
+task.spawn(function()
+    while task.wait(2) do
+        if not plr.Team and getgenv().Config.Team then
+            local gui = plr.PlayerGui:FindFirstChild("Main")
+            if gui and gui:FindFirstChild("ChooseTeam") then
+                local team = getgenv().Config.Team
+                pcall(function()
+                    local btn = gui.ChooseTeam.Container[team].Frame.TextButton
+                    for _, conn in pairs(getconnections(btn.Activated)) do
+                        conn.Function()
+                    end
+                end)
+            end
+        end
+    end
+end)
+
+-- Auto summon Sea Beast nếu đủ 10M bounty
+task.spawn(function()
+    while task.wait(5) do
+        if getgenv().Config.AutoSummonSeaBeast and plr.leaderstats and plr.leaderstats.Bounty and plr.leaderstats.Bounty.Value >= 10000000 then
+            game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("SpawnSeabeast")
+        end
+    end
+end)
+
+-- Fly xuyên tường + giữ khoảng cách biển
+task.spawn(function()
+    while task.wait(0.1) do
+        pcall(function()
+            hrp = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                hrp.Velocity = Vector3.new(0, 0, 0)
+                hrp.CanCollide = false
+                hrp.Anchored = false
+                if hrp.Position.Y < 0 then
+                    hrp.CFrame = hrp.CFrame + Vector3.new(0, 100, 0)
+                end
+            end
+        end)
+    end
+end)
+
+-- Auto né đòn khi máu thấp, bay lên trời
+task.spawn(function()
+    while task.wait(0.5) do
+        pcall(function()
+            if plr.Character and plr.Character:FindFirstChild("Humanoid") and hrp then
+                local hp = plr.Character.Humanoid.Health
+                local max = plr.Character.Humanoid.MaxHealth
+                local percent = (hp / max) * 100
+
+                if percent <= (getgenv().Config.LowHealthFlyUp or 10) then
+                    hrp.CFrame = hrp.CFrame + Vector3.new(0, 100, 0)
+                elseif percent >= (getgenv().Config.ComebackHealth or 30) then
+                    -- xuống kill tiếp
+                    hrp.CFrame = hrp.CFrame - Vector3.new(0, 100, 0)
+                end
+            end
+        end)
+    end
+end)
+
+-- Water Walk / Lava Walk
+task.spawn(function()
+    while task.wait(1) do
+        pcall(function()
+            if plr.Character then
+                for _, part in pairs(plr.Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+                local float = Instance.new("Part", plr.Character)
+                float.Size = Vector3.new(5, 1, 5)
+                float.Anchored = true
+                float.Transparency = 1
+                float.CanCollide = true
+                float.Position = hrp.Position - Vector3.new(0, 3.8, 0)
+                game.Debris:AddItem(float, 0.1)
+            end
+        end)
+    end
+end)
+
+-- Fix stuck khi bị kẹt tường
+task.spawn(function()
+    while task.wait(3) do
+        pcall(function()
+            if hrp and (hrp.Position.Y < -50 or hrp.Velocity.Magnitude < 1) then
+                hrp.CFrame = hrp.CFrame + Vector3.new(0, 100, 0)
+            end
+        end)
+    end
+end)
+
+print("[Anura Hub] Part4 loaded: Movement & Health support active.")
+
+-- Anura Hub New UI Part 5 - Giao diện Auto Bounty mượt & đẹp
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local plr = Players.LocalPlayer
+local startTime = tick()
+
+-- Giao diện chính
+local gui = Instance.new("ScreenGui", plr:WaitForChild("PlayerGui"))
+gui.Name = "AnuraAutoBountyUI"
+gui.ResetOnSpawn = false
+
+-- Frame chính
+local main = Instance.new("Frame", gui)
+main.Size = UDim2.new(0, 350, 0, 250)
+main.Position = UDim2.new(0, 20, 0.35, 0)
+main.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+main.BorderSizePixel = 0
+main.Active = true
+main.Draggable = true
+
+-- Viền 7 màu
+local stroke = Instance.new("UIStroke", main)
+stroke.Thickness = 2
+stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+stroke.Color = Color3.fromRGB(255, 0, 0)
+task.spawn(function()
+	local colors = {
+		Color3.fromRGB(255, 0, 0),
+		Color3.fromRGB(255, 128, 0),
+		Color3.fromRGB(255, 255, 0),
+		Color3.fromRGB(0, 255, 0),
+		Color3.fromRGB(0, 255, 255),
+		Color3.fromRGB(0, 128, 255),
+		Color3.fromRGB(128, 0, 255),
+		Color3.fromRGB(255, 0, 255)
+	}
+	local i = 1
+	while true do
+		stroke.Color = colors[i]
+		i = (i % #colors) + 1
+		wait(0.2)
+	end
+end)
+
+-- Hình nền
+local bg = Instance.new("ImageLabel", main)
+bg.Size = UDim2.new(1, 0, 1, 0)
+bg.Position = UDim2.new(0, 0, 0, 0)
+bg.Image = "rbxassetid://131220073739500"
+bg.BackgroundTransparency = 1
+bg.ImageTransparency = 0.6
+
+-- Label helper
+local function newLabel(text, y)
+	local lbl = Instance.new("TextLabel", main)
+	lbl.Size = UDim2.new(1, -20, 0, 22)
+	lbl.Position = UDim2.new(0, 10, 0, y)
+	lbl.BackgroundTransparency = 1
+	lbl.Font = Enum.Font.GothamBold
+	lbl.TextSize = 14
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.TextColor3 = Color3.new(1, 1, 1)
+	lbl.Text = text
+	return lbl
+end
+
+local title = newLabel("TỰ HÀO VIỆT NAM🇻🇳 30/04/1975 ", 10)
+title.TextSize = 16
+title.TextColor3 = Color3.fromRGB(255, 215, 0)
+
+local targetLbl = newLabel("Target: Không", 40)
+local bountyLbl = newLabel("Bounty: 0", 65)
+local serverLbl = newLabel("Người trong server: 0", 90)
+local timeLbl = newLabel("Thời gian: 0h 0m 0s", 115)
+local fpsLbl = newLabel("FPS: 0", 140)
+
+-- Nút Next Player
+local nextBtn = Instance.new("TextButton", main)
+nextBtn.Size = UDim2.new(0, 160, 0, 30)
+nextBtn.Position = UDim2.new(0, 10, 1, -40)
+nextBtn.Text = "Next Player"
+nextBtn.Font = Enum.Font.GothamBold
+nextBtn.TextColor3 = Color3.new(1, 1, 1)
+nextBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+nextBtn.TextSize = 14
+nextBtn.MouseButton1Click:Connect(function()
+	_G.ForceNextTarget = true
+end)
+
+-- Nút Toggle UI
+local toggle = Instance.new("TextButton", gui)
+toggle.Size = UDim2.new(0, 35, 0, 35)
+toggle.Position = UDim2.new(0, 0, 0.35, 0)
+toggle.Text = "-"
+toggle.TextSize = 24
+toggle.Font = Enum.Font.GothamBold
+toggle.TextColor3 = Color3.new(1, 1, 1)
+toggle.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+toggle.MouseButton1Click:Connect(function()
+	main.Visible = not main.Visible
+end)
+
+-- Cập nhật UI
+RunService.RenderStepped:Connect(function()
+	local timeUsed = tick() - startTime
+	local h = math.floor(timeUsed / 3600)
+	local m = math.floor((timeUsed % 3600) / 60)
+	local s = math.floor(timeUsed % 60)
+
+	local fps = math.floor(1 / RunService.RenderStepped:Wait())
+
+	timeLbl.Text = string.format("Thời gian: %dh %dm %ds", h, m, s)
+	fpsLbl.Text = "FPS: " .. tostring(fps)
+	serverLbl.Text = "Người trong server: " .. tostring(#Players:GetPlayers())
+
+	local t = _G.AutoBountyTarget and _G.AutoBountyTarget:FindFirstChild("HumanoidRootPart") and _G.AutoBountyTarget.Parent
+	if t and t:IsA("Model") then
+		targetLbl.Text = "Target: " .. t.Name
+	else
+		targetLbl.Text = "Target: Không"
+	end
+
+	bountyLbl.Text = "Bounty: " .. tostring(plr.leaderstats and plr.leaderstats.Bounty and plr.leaderstats.Bounty.Value or 0)
+end)
+
+print("[Anura Hub] UI part 5 loaded – Viền 7 màu, hình nền, thông tin đầy đủ")
+
+-- Part6: Anti Lag, Anti Ban, Anti Death, Fix Stuck by Anura Hub
+
+local plr = game.Players.LocalPlayer
+local ws = game.Workspace
+
+-- Anti-AFK kick
+pcall(function()
+    game:GetService("Players").LocalPlayer.Idled:Connect(function()
+        game:GetService("VirtualUser"):CaptureController()
+        game:GetService("VirtualUser"):ClickButton2(Vector2.new())
+    end)
+end)
+
+-- Anti banwave (simple check bypass)
+pcall(function()
+    local mt = getrawmetatable(game)
+    setreadonly(mt, false)
+    local old = mt.__namecall
+    mt.__namecall = newcclosure(function(...)
+        local args = {...}
+        if getnamecallmethod() == "Kick" or tostring(args[1]):lower():find("kick") then
+            return warn("[Anura Hub] Anti Kick Blocked")
+        end
+        return old(...)
+    end)
+end)
+
+-- Fix stuck khi đứng yên hoặc kẹt map
+task.spawn(function()
+    while wait(5) do
+        pcall(function()
+            local hrp = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
+            if hrp and hrp.Velocity.Magnitude < 1 then
+                hrp.CFrame = hrp.CFrame + Vector3.new(0, 10, 0)
+            end
+        end)
+    end
+end)
+
+-- Anti chết do nước/lava
+task.spawn(function()
+    while wait(1) do
+        pcall(function()
+            if plr.Character then
+                for _, v in pairs(plr.Character:GetDescendants()) do
+                    if v:IsA("BasePart") then
+                        v.CanCollide = false
+                    end
+                end
+                local float = Instance.new("Part", plr.Character)
+                float.Size = Vector3.new(5, 1, 5)
+                float.Anchored = true
+                float.Transparency = 1
+                float.CanCollide = true
+                float.Position = plr.Character.HumanoidRootPart.Position - Vector3.new(0, 3.8, 0)
+                game.Debris:AddItem(float, 0.1)
+            end
+        end)
+    end
+end)
+
+-- Anti death simple skill dodge (basic)
+task.spawn(function()
+    while wait(0.5) do
+        pcall(function()
+            if plr.Character and plr.Character.Humanoid.Health <= 20 then
+                plr.Character.HumanoidRootPart.CFrame = plr.Character.HumanoidRootPart.CFrame + Vector3.new(0, 80, 0)
+            end
+        end)
+    end
+end)
+
+print("[Anura Hub] Part6 loaded: Full Anti Protection Enabled")
+-- Part6 Final: Auto Buffs + Server Hop Fix + Full Protection
+
+local plr = game.Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local vu = game:GetService("VirtualInputManager")
+local rs = game:GetService("ReplicatedStorage")
+
+-- ========== Tự bật Aura nếu bị tắt (phím J) ==========
+task.spawn(function()
+    while task.wait(1) do
+        pcall(function()
+            if not plr.Character:FindFirstChild("HasBuso") then
+                vu:SendKeyEvent(true, "J", false, game)
+                wait(0.1)
+                vu:SendKeyEvent(false, "J", false, game)
+            end
+        end)
+    end
+end)
+
+-- ========== Tự bật Instinct nếu hồi xong (phím E) ==========
+task.spawn(function()
+    while task.wait(0.5) do
+        pcall(function()
+            local gui = plr.PlayerGui:FindFirstChild("Main")
+            local instinctIcon = gui and gui:FindFirstChild("ImageLabel")
+            if instinctIcon and instinctIcon.ImageTransparency == 0 then
+                vu:SendKeyEvent(true, "E", false, game)
+                wait(0.1)
+                vu:SendKeyEvent(false, "E", false, game)
+            end
+        end)
+    end
+end)
+
+-- ========== Auto bật V3 (phím T), V4 (phím Y) liên tục ==========
+task.spawn(function()
+    while task.wait(3) do
+        vu:SendKeyEvent(true, "T", false, game)
+        wait(0.1)
+        vu:SendKeyEvent(false, "T", false, game)
+
+        vu:SendKeyEvent(true, "Y", false, game)
+        wait(0.1)
+        vu:SendKeyEvent(false, "Y", false, game)
+    end
+end)
+
+-- ========== Server Hop Fix ==========
+function HopServer()
+    local HttpService = game:GetService("HttpService")
+    local TPS = game:GetService("TeleportService")
+    local PlaceID = game.PlaceId
+    local function ListServers(cursor)
+        local req = ""
+        if cursor then
+            req = "?cursor="..cursor
+        end
+        local success, result = pcall(function()
+            return game:HttpGet("https://games.roblox.com/v1/games/"..PlaceID.."/servers/Public"..req)
+        end)
+        if success then
+            return HttpService:JSONDecode(result)
+        end
+        return nil
+    end
+
+    local servers = {}
+    local cursor = nil
+    repeat
+        local data = ListServers(cursor)
+        if data then
+            for _, s in pairs(data.data) do
+                if s.playing < s.maxPlayers and s.id ~= game.JobId then
+                    table.insert(servers, s.id)
+                end
+            end
+            cursor = data.nextPageCursor
+        end
+    until not cursor or #servers >= 10
+
+    if #servers > 0 then
+        print("[Anura Hub] Hopping to new server...")
+        TPS:TeleportToPlaceInstance(PlaceID, servers[math.random(1, #servers)], plr)
+    else
+        warn("[Anura Hub] No suitable servers found.")
+    end
+end
+
+-- ========== Gọi Server Hop khi không còn target ==========
+task.spawn(function()
+    while task.wait(10) do
+        local found = false
+        for _, p in pairs(game.Players:GetPlayers()) do
+            if p ~= plr and p.Character and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+                if p.Team ~= plr.Team and not p.PlayerGui.Main.PvpDisabled.Visible then
+                    found = true
+                    break
+                end
+            end
+        end
+        if not found then
+            HopServer()
+        end
+    end
+end)
+
+print("[Anura Hub] Final Part6 update loaded: Buffs & Server Hop Fixed.")
+-- Thông báo đặc biệt KỈ NIỆM 50 NĂM GIẢI PHÓNG
+
+local plr = game.Players.LocalPlayer
+local ui = Instance.new("ScreenGui", plr:WaitForChild("PlayerGui"))
+ui.Name = "AnuraHubNotice"
+ui.ResetOnSpawn = false
+
+local upper = Instance.new("TextLabel", ui)
+upper.Size = UDim2.new(1, 0, 0, 40)
+upper.Position = UDim2.new(0, 0, 0, 10)
+upper.BackgroundTransparency = 1
+upper.Text = "KỈ NIỆM 50 NĂM"
+upper.Font = Enum.Font.GothamBold
+upper.TextSize = 28
+upper.TextColor3 = Color3.fromRGB(255, 215, 0)
+upper.TextStrokeTransparency = 0.7
+upper.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+upper.TextScaled = false
+
+local lower = Instance.new("TextLabel", ui)
+lower.Size = UDim2.new(1, 0, 0, 25)
+lower.Position = UDim2.new(0, 0, 0, 45)
+lower.BackgroundTransparency = 1
+lower.Text = "GIẢI PHÓNG MIỀN NAM, THỐNG NHẤT ĐẤT NƯỚC 🇻🇳"
+lower.Font = Enum.Font.GothamBold
+lower.TextSize = 20
+lower.TextColor3 = Color3.fromRGB(255, 215, 0)
+lower.TextStrokeTransparency = 0.7
+lower.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+lower.TextWrapped = true
+-- Dòng credit góc màn hình (7 màu nhấp nháy)
+local plr = game.Players.LocalPlayer
+local creditUI = Instance.new("ScreenGui", plr:WaitForChild("PlayerGui"))
+creditUI.Name = "AnuraCredit"
+creditUI.ResetOnSpawn = false
+creditUI.ZIndexBehavior = Enum.ZIndexBehavior.Global
+
+local credit = Instance.new("TextLabel", creditUI)
+credit.Size = UDim2.new(0, 250, 0, 20)
+credit.Position = UDim2.new(0, 5, 0, 5)
+credit.BackgroundTransparency = 1
+credit.Font = Enum.Font.GothamBold
+credit.TextSize = 14
+credit.Text = "Create: Anura & Thy Aris"
+credit.TextColor3 = Color3.fromRGB(255, 0, 0)
+credit.TextXAlignment = Enum.TextXAlignment.Left
+credit.TextStrokeTransparency = 0.7
+credit.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+
+-- Hiệu ứng đổi màu 7 màu liên tục
+task.spawn(function()
+    local rainbow = {
+        Color3.fromRGB(255, 0, 0),
+        Color3.fromRGB(255, 128, 0),
+        Color3.fromRGB(255, 255, 0),
+        Color3.fromRGB(0, 255, 0),
+        Color3.fromRGB(0, 255, 255),
+        Color3.fromRGB(0, 128, 255),
+        Color3.fromRGB(128, 0, 255),
+        Color3.fromRGB(255, 0, 255)
+    }
+    local i = 1
+    while wait(0.3) do
+        credit.TextColor3 = rainbow[i]
+        i = (i % #rainbow) + 1
+    end
+end)
+-- Part7: FPS Boost Hardcore by Anura Hub
+
+local ws = game:GetService("Workspace")
+local lighting = game:GetService("Lighting")
+local plr = game.Players.LocalPlayer
+
+-- Đổi tất cả Part thành màu xám
+local function grayify()
+    for _, v in pairs(ws:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.Color = Color3.fromRGB(128, 128, 128)
+            v.Material = Enum.Material.SmoothPlastic
+            if v:FindFirstChildOfClass("Decal") then
+                v:FindFirstChildOfClass("Decal"):Destroy()
+            end
+        end
+    end
+end
+
+-- Xoá hiệu ứng lag
+local function removeEffects()
+    for _, v in pairs(ws:GetDescendants()) do
+        if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Beam") or v:IsA("Explosion") then
+            v:Destroy()
+        end
+    end
+end
+
+-- Xoá ánh sáng, chỉnh lighting
+local function optimizeLighting()
+    lighting.GlobalShadows = false
+    lighting.FogEnd = 100000
+    lighting.Brightness = 1
+    lighting.TimeOfDay = "14:00:00"
+end
+
+-- Xoá map thừa (trees, sea, fog,...)
+local keywords = {"tree", "rain", "cloud", "sea", "fog", "lava", "water", "deco", "grass", "effect", "fx"}
+local function destroyByName()
+    for _, obj in pairs(ws:GetDescendants()) do
+        for _, word in pairs(keywords) do
+            if obj.Name:lower():find(word) then
+                pcall(function() obj:Destroy() end)
+            end
+        end
+    end
+end
+
+-- Auto update nếu có object mới
+ws.DescendantAdded:Connect(function(obj)
+    wait(0.1)
+    pcall(function()
+        if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Beam") or obj:IsA("Explosion") then
+            obj:Destroy()
+        elseif obj:IsA("BasePart") then
+            obj.Color = Color3.fromRGB(128, 128, 128)
+            obj.Material = Enum.Material.SmoothPlastic
+        end
+    end)
+end)
+
+-- Chạy tất cả
+grayify()
+removeEffects()
+optimizeLighting()
+destroyByName()
+
+print("[Anura Hub] Part7 loaded: FPS Boost mạnh đã kích hoạt.")
+)
+            end
+        end
+    end
+end
+
+-- Auto update nếu có object mới
+ws.DescendantAdded:Connect(function(obj)
+    wait(0.1)
+    pcall(function()
+        if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Beam") or obj:IsA("Explosion") then
+            obj:Destroy()
+        elseif obj:IsA("BasePart") then
+            obj.Color = Color3.fromRGB(128, 128, 128)
+            obj.Material = Enum.Material.SmoothPlastic
+        end
+    end)
+end)
+
+-- Chạy tất cả
+grayify()
+removeEffects()
+optimizeLighting()
+destroyByName()
+
+print("[Anura Hub] Part7 loaded: FPS Boost mạnh đã kích hoạt.")
