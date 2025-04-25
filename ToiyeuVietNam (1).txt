@@ -564,7 +564,56 @@ print("[Anura Hub] UI part 5 loaded – Viền 7 màu, hình nền, thông tin �
 
 local plr = game.Players.LocalPlayer
 local ws = game.Workspace
+-- Anura Hub - Fix Lag Nặng Nhất (Map tối giản mạnh, giữ gameplay)
+pcall(function()
+    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
 
+    local lighting = game:GetService("Lighting")
+    lighting.GlobalShadows = false
+    lighting.FogEnd = 1e9
+    lighting.Brightness = 1
+    lighting.EnvironmentDiffuseScale = 0
+    lighting.EnvironmentSpecularScale = 0
+    for _,v in pairs(lighting:GetChildren()) do
+        if v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("BloomEffect") 
+        or v:IsA("ColorCorrectionEffect") or v:IsA("DepthOfFieldEffect") then
+            v:Destroy()
+        end
+    end
+
+    for _,v in pairs(game:GetDescendants()) do
+        if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") then
+            v:Destroy()
+        end
+
+        if v:IsA("Decal") or v:IsA("Texture") then
+            v:Destroy()
+        end
+
+        if v:IsA("BasePart") or v:IsA("MeshPart") then
+            if not v:IsDescendantOf(game.Players.LocalPlayer.Character) then
+                v.Material = Enum.Material.SmoothPlastic
+                v.Reflectance = 0
+                v.CastShadow = false
+
+                -- Xoá những object nhẹ tênh (lá, cây, mây, fx, decor,...)
+                local name = v.Name:lower()
+                if name:find("tree") or name:find("leaf") or name:find("grass") or name:find("bush") or name:find("rock")
+                or name:find("cloud") or name:find("fx") or name:find("fog") or name:find("decal") or name:find("deco") then
+                    v:Destroy()
+                end
+            end
+        end
+    end
+
+    local terrain = workspace:FindFirstChildOfClass("Terrain")
+    if terrain then
+        terrain.WaterWaveSize = 0
+        terrain.WaterWaveSpeed = 0
+        terrain.WaterReflectance = 0
+        terrain.WaterTransparency = 1
+    end
+end)
 -- Anti-AFK kick
 pcall(function()
     game:GetService("Players").LocalPlayer.Idled:Connect(function()
