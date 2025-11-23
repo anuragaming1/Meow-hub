@@ -1,0 +1,22 @@
+-- Gui đơn giản hiện thông báo vàng giữa màn hình
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Tạo ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "WarningGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Tạo TextLabel
+local textLabel = Instance.new("TextLabel")
+textLabel.Size = UDim2.new(0.8, 0, 0.2, 0) -- 80% chiều ngang, 20% chiều cao
+textLabel.Position = UDim2.new(0.1, 0, 0.4, 0) -- căn giữa màn hình
+textLabel.BackgroundTransparency = 1 -- trong suốt
+textLabel.Text = "Script đã bị xoá, hãy nhắn tin Anura Gaming để được hỗ trợ"
+textLabel.TextColor3 = Color3.fromRGB(255, 255, 0) -- màu vàng
+textLabel.TextScaled = true -- tự động scale theo box
+textLabel.Font = Enum.Font.SourceSansBold
+textLabel.TextStrokeTransparency = 0.5 -- viền chữ
+
+textLabel.Parent = screenGui
